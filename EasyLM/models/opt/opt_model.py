@@ -644,8 +644,7 @@ class FlaxOPTDecoderLayerCollection(nn.Module):
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
 
-        outputs = [hidden_states, all_hidden_states, all_self_attns]
-        return outputs
+        return [hidden_states, all_hidden_states, all_self_attns]
 
 
 class FlaxOPTLearnedPositionalEmbedding(nn.Embed):
@@ -798,15 +797,14 @@ class FlaxOPTPreTrainedModel(FlaxPreTrainedModel):
         )
 
         random_params = module_init_outputs["params"]
-        if params is not None:
-            random_params = flatten_dict(unfreeze(random_params))
-            params = flatten_dict(unfreeze(params))
-            for missing_key in self._missing_keys:
-                params[missing_key] = random_params[missing_key]
-            self._missing_keys = set()
-            return freeze(unflatten_dict(params))
-        else:
+        if params is None:
             return random_params
+        random_params = flatten_dict(unfreeze(random_params))
+        params = flatten_dict(unfreeze(params))
+        for missing_key in self._missing_keys:
+            params[missing_key] = random_params[missing_key]
+        self._missing_keys = set()
+        return freeze(unflatten_dict(params))
 
     def init_cache(self, batch_size, max_length):
         r"""
@@ -884,7 +882,7 @@ class FlaxOPTPreTrainedModel(FlaxPreTrainedModel):
             outputs, past_key_values = outputs
             outputs["past_key_values"] = unfreeze(past_key_values["cache"])
             return outputs
-        elif past_key_values is not None and not return_dict:
+        elif past_key_values is not None:
             outputs, past_key_values = outputs
             outputs = outputs[:1] + (unfreeze(past_key_values["cache"]),) + outputs[1:]
 

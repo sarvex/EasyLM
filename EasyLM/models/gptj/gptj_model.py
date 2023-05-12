@@ -552,8 +552,7 @@ class FlaxGPTJAttention(nn.Module):
         attn_output = self.out_proj(attn_output)
         attn_output = self.resid_dropout(attn_output, deterministic=deterministic)
 
-        outputs = (attn_output, attn_weights) if output_attentions else (attn_output,)
-        return outputs
+        return (attn_output, attn_weights) if output_attentions else (attn_output,)
 
 
 class FlaxGPTJMLP(nn.Module):
@@ -672,15 +671,14 @@ class FlaxGPTJPreTrainedModel(FlaxPreTrainedModel):
 
         random_params = module_init_outputs["params"]
 
-        if params is not None:
-            random_params = flatten_dict(unfreeze(random_params))
-            params = flatten_dict(unfreeze(params))
-            for missing_key in self._missing_keys:
-                params[missing_key] = random_params[missing_key]
-            self._missing_keys = set()
-            return freeze(unflatten_dict(params))
-        else:
+        if params is None:
             return random_params
+        random_params = flatten_dict(unfreeze(random_params))
+        params = flatten_dict(unfreeze(params))
+        for missing_key in self._missing_keys:
+            params[missing_key] = random_params[missing_key]
+        self._missing_keys = set()
+        return freeze(unflatten_dict(params))
 
     def init_cache(self, batch_size, max_length):
         r"""
@@ -773,7 +771,7 @@ class FlaxGPTJPreTrainedModel(FlaxPreTrainedModel):
             outputs, past_key_values = outputs
             outputs["past_key_values"] = unfreeze(past_key_values["cache"])
             return outputs
-        elif past_key_values is not None and not return_dict:
+        elif past_key_values is not None:
             outputs, past_key_values = outputs
             outputs = outputs[:1] + (unfreeze(past_key_values["cache"]),) + outputs[1:]
 
@@ -842,10 +840,7 @@ class FlaxGPTJBlockCollection(nn.Module):
             if output_attentions:
                 all_attentions += (layer_outputs[1],)
 
-        # this contains possible `None` values - `FlaxGPTJModule` will filter them out
-        outputs = (hidden_states, all_hidden_states, all_attentions)
-
-        return outputs
+        return hidden_states, all_hidden_states, all_attentions
 
 
 class FlaxGPTJModule(nn.Module):

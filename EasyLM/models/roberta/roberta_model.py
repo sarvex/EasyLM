@@ -546,8 +546,7 @@ class FlaxRobertaSelfAttention(nn.Module):
         attn_output = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states)
         attn_output = attn_output.reshape(attn_output.shape[:2] + (-1,))
 
-        outputs = (attn_output, attn_weights) if output_attentions else (attn_output,)
-        return outputs
+        return (attn_output, attn_weights) if output_attentions else (attn_output,)
 
 
 # Copied from transformers.models.bert.modeling_flax_bert.FlaxBertSelfOutput with Bert->Roberta
@@ -749,12 +748,11 @@ class FlaxRobertaLayerCollection(nn.Module):
         all_cross_attentions = () if (output_attentions and encoder_hidden_states is not None) else None
 
         # Check if head_mask has a correct number of layers specified if desired
-        if head_mask is not None:
-            if head_mask.shape[0] != (len(self.layers)):
-                raise ValueError(
-                    f"The head_mask should be specified for {len(self.layers)} layers, but it is for                  "
-                    f"       {head_mask.shape[0]}."
-                )
+        if head_mask is not None and head_mask.shape[0] != (len(self.layers)):
+            raise ValueError(
+                f"The head_mask should be specified for {len(self.layers)} layers, but it is for                  "
+                f"       {head_mask.shape[0]}."
+            )
 
         for i, layer in enumerate(self.layers):
             if output_hidden_states:
@@ -984,15 +982,14 @@ class FlaxRobertaPreTrainedModel(FlaxPreTrainedModel):
 
         random_params = module_init_outputs["params"]
 
-        if params is not None:
-            random_params = flatten_dict(unfreeze(random_params))
-            params = flatten_dict(unfreeze(params))
-            for missing_key in self._missing_keys:
-                params[missing_key] = random_params[missing_key]
-            self._missing_keys = set()
-            return freeze(unflatten_dict(params))
-        else:
+        if params is None:
             return random_params
+        random_params = flatten_dict(unfreeze(random_params))
+        params = flatten_dict(unfreeze(params))
+        for missing_key in self._missing_keys:
+            params[missing_key] = random_params[missing_key]
+        self._missing_keys = set()
+        return freeze(unflatten_dict(params))
 
     # Copied from transformers.models.bart.modeling_flax_bart.FlaxBartDecoderPreTrainedModel.init_cache
     def init_cache(self, batch_size, max_length):
@@ -1090,7 +1087,7 @@ class FlaxRobertaPreTrainedModel(FlaxPreTrainedModel):
                 outputs, past_key_values = outputs
                 outputs["past_key_values"] = unfreeze(past_key_values["cache"])
                 return outputs
-            elif past_key_values is not None and not return_dict:
+            elif past_key_values is not None:
                 outputs, past_key_values = outputs
                 outputs = outputs[:1] + (unfreeze(past_key_values["cache"]),) + outputs[1:]
 
